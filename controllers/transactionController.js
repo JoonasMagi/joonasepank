@@ -1,24 +1,109 @@
-const Transaction = require('../models/transaction');
-const Account = require('../models/account');
+const Transaction = require('../models/Transaction');
+const Account = require('../models/Account');
+const { sequelize } = require('../db/config');
+const { Op } = require('sequelize');
 const axios = require('axios');
 const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
-const { Op } = require('sequelize');
-const { sequelize } = require('../db/database');
 
-// Import bank utils
-const { isSameBank, getCentralBankInfo, getBankInfo } = require('../utils/bankUtils');
+// Import utility functions
+const {
+  isSameBank,
+  getBankInfo,
+  signJWT,
+  verifyJWT,
+  getJWKS,
+  BANK_PREFIX
+} = require('../utils/bankUtils');
 
-// Create an internal transaction (within the same bank)
+/**
+ * Get all transactions
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getAllTransactions = async (req, res) => {
+  try {
+    const transactions = await Transaction.findAll({
+      order: [['createdAt', 'DESC']]
+    });
+    
+    res.status(200).json({
+      success: true,
+      count: transactions.length,
+      data: transactions
+    });
+  } catch (error) {
+    console.error('Error getting transactions:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error'
+    });
+  }
+};
+
+/**
+ * Get transaction by ID
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getTransactionById = async (req, res) => {
+  try {
+    const transaction = await Transaction.findOne({
+      where: { id: req.params.id }
+    });
+    
+    if (!transaction) {
+      return res.status(404).json({
+        success: false,
+        error: 'Transaction not found'
+      });
+    }
+    
+    res.status(200).json({
+      success: true,
+      data: transaction
+    });
+  } catch (error) {
+    console.error('Error getting transaction:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Server error'
+    });
+  }
+};
+
+/**
+ * Create internal transaction (within the same bank)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.createInternalTransaction = async (req, res) => {
-  // Start a transaction to ensure data consistency
+  // Start a database transaction for consistency
   const dbTransaction = await sequelize.transaction();
   
   try {
     const { accountFrom, accountTo, amount, currency, explanation, senderName } = req.body;
-
-    // Check if both accounts exist
+    
+    // Input validation
+    if (!accountFrom || !accountTo || !amount || !currency || !explanation || !senderName) {
+      await dbTransaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide all required fields'
+      });
+    }
+    
+    // Check if amount is valid
+    if (amount <= 0) {
+      await dbTransaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Amount must be greater than 0'
+      });
+    }
+    
+    // Find source and target accounts
     const sourceAccount = await Account.findOne({ 
       where: { accountNumber: accountFrom },
       transaction: dbTransaction
@@ -28,33 +113,35 @@ exports.createInternalTransaction = async (req, res) => {
       where: { accountNumber: accountTo },
       transaction: dbTransaction
     });
-
+    
+    // Validate source account
     if (!sourceAccount) {
       await dbTransaction.rollback();
       return res.status(404).json({
         success: false,
-        error: 'Source account not found',
+        error: 'Source account not found'
       });
     }
-
+    
+    // Validate target account
     if (!targetAccount) {
       await dbTransaction.rollback();
       return res.status(404).json({
         success: false,
-        error: 'Target account not found',
+        error: 'Target account not found'
       });
     }
-
+    
     // Check if source account has sufficient funds
     if (sourceAccount.balance < amount) {
       await dbTransaction.rollback();
       return res.status(402).json({
         success: false,
-        error: 'Insufficient funds',
+        error: 'Insufficient funds'
       });
     }
-
-    // Create a transaction record
+    
+    // Create transaction record
     const transaction = await Transaction.create({
       accountFrom,
       accountTo,
@@ -64,67 +151,92 @@ exports.createInternalTransaction = async (req, res) => {
       senderName,
       receiverName: targetAccount.owner,
       status: 'completed',
-      isInternalTransaction: true,
-    }, { transaction: dbTransaction });
-
-    // Update account balances
-    await sourceAccount.update({
-      balance: sourceAccount.balance - amount
+      isInternal: true
     }, { transaction: dbTransaction });
     
-    await targetAccount.update({
-      balance: targetAccount.balance + amount
-    }, { transaction: dbTransaction });
-
+    // Update account balances
+    await sourceAccount.update(
+      { balance: sequelize.literal(`balance - ${amount}`) },
+      { transaction: dbTransaction }
+    );
+    
+    await targetAccount.update(
+      { balance: sequelize.literal(`balance + ${amount}`) },
+      { transaction: dbTransaction }
+    );
+    
     // Commit the transaction
     await dbTransaction.commit();
-
+    
     res.status(201).json({
       success: true,
-      data: transaction,
+      data: transaction
     });
   } catch (error) {
-    // Rollback the transaction in case of error
+    // Rollback in case of error
     await dbTransaction.rollback();
     console.error('Error creating internal transaction:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: 'Server error'
     });
   }
 };
 
-// Create an external transaction (to another bank)
+/**
+ * Create external transaction (to another bank)
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.createExternalTransaction = async (req, res) => {
-  // Start a transaction to ensure data consistency
+  // Start a database transaction for consistency
   const dbTransaction = await sequelize.transaction();
   
   try {
     const { accountFrom, accountTo, amount, currency, explanation, senderName } = req.body;
-
-    // Check if source account exists
+    
+    // Input validation
+    if (!accountFrom || !accountTo || !amount || !currency || !explanation || !senderName) {
+      await dbTransaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide all required fields'
+      });
+    }
+    
+    // Check if amount is valid
+    if (amount <= 0) {
+      await dbTransaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Amount must be greater than 0'
+      });
+    }
+    
+    // Find source account
     const sourceAccount = await Account.findOne({ 
       where: { accountNumber: accountFrom },
       transaction: dbTransaction
     });
-
+    
+    // Validate source account
     if (!sourceAccount) {
       await dbTransaction.rollback();
       return res.status(404).json({
         success: false,
-        error: 'Source account not found',
+        error: 'Source account not found'
       });
     }
-
+    
     // Check if source account has sufficient funds
     if (sourceAccount.balance < amount) {
       await dbTransaction.rollback();
       return res.status(402).json({
         success: false,
-        error: 'Insufficient funds',
+        error: 'Insufficient funds'
       });
     }
-
+    
     // Create a pending transaction record
     const transaction = await Transaction.create({
       accountFrom,
@@ -134,383 +246,313 @@ exports.createExternalTransaction = async (req, res) => {
       explanation,
       senderName,
       status: 'pending',
-      isInternalTransaction: false,
+      isInternal: false
     }, { transaction: dbTransaction });
-
-    // Check if target account is in the same bank
+    
+    // Check if the target account is in the same bank
     if (isSameBank(accountTo)) {
-      // Handle as internal transaction
-      const targetAccount = await Account.findOne({ 
+      // It's actually an internal transaction
+      const targetAccount = await Account.findOne({
         where: { accountNumber: accountTo },
         transaction: dbTransaction
       });
-
+      
       if (!targetAccount) {
-        await transaction.update({ status: 'failed' }, { transaction: dbTransaction });
+        await transaction.update(
+          { status: 'failed', failureReason: 'Target account not found' },
+          { transaction: dbTransaction }
+        );
+        
         await dbTransaction.commit();
+        
         return res.status(404).json({
           success: false,
-          error: 'Target account not found',
+          error: 'Target account not found'
         });
       }
-
-      // Update account balances
-      await sourceAccount.update({
-        balance: sourceAccount.balance - amount
+      
+      // Update transaction to be internal
+      await transaction.update({
+        isInternal: true,
+        receiverName: targetAccount.owner,
+        status: 'completed'
       }, { transaction: dbTransaction });
       
-      await targetAccount.update({
-        balance: targetAccount.balance + amount
-      }, { transaction: dbTransaction });
-
-      // Update transaction status
-      await transaction.update({
-        status: 'completed',
-        receiverName: targetAccount.owner,
-        isInternalTransaction: true,
-      }, { transaction: dbTransaction });
-
-      // Commit the transaction
+      // Update account balances
+      await sourceAccount.update(
+        { balance: sequelize.literal(`balance - ${amount}`) },
+        { transaction: dbTransaction }
+      );
+      
+      await targetAccount.update(
+        { balance: sequelize.literal(`balance + ${amount}`) },
+        { transaction: dbTransaction }
+      );
+      
       await dbTransaction.commit();
-
+      
       return res.status(201).json({
         success: true,
-        data: transaction,
+        data: transaction
       });
     }
-
-    // Handle external transaction
+    
+    // It's a truly external transaction to another bank
     try {
-      // Get target bank information from Central Bank
+      // Get the target bank prefix
       const targetBankPrefix = accountTo.substring(0, 3);
+      
+      // Get target bank information from Central Bank
       const bankInfo = await getBankInfo(targetBankPrefix);
-
-      if (!bankInfo) {
-        await transaction.update({ status: 'failed' }, { transaction: dbTransaction });
+      
+      if (!bankInfo || !bankInfo.transactionUrl) {
+        await transaction.update(
+          { status: 'failed', failureReason: 'Target bank not found' },
+          { transaction: dbTransaction }
+        );
+        
         await dbTransaction.commit();
+        
         return res.status(404).json({
           success: false,
-          error: 'Target bank not found',
+          error: 'Target bank not found or invalid'
         });
       }
-
+      
+      // Update transaction with external bank info
+      await transaction.update({
+        externalBankId: targetBankPrefix
+      }, { transaction: dbTransaction });
+      
       // Create JWT payload
       const payload = {
         accountFrom,
         accountTo,
-        currency,
         amount,
+        currency,
         explanation,
-        senderName,
+        senderName
       };
-
-      // Load private key
-      const privateKeyPath = process.env.PRIVATE_KEY_PATH || path.join(__dirname, '../private-key.pem');
-      const privateKey = fs.readFileSync(privateKeyPath, 'utf8');
-
-      // Sign JWT
-      const token = jwt.sign(payload, privateKey, { algorithm: 'RS256', keyid: '1' });
-
+      
+      // Sign JWT with bank's private key
+      const token = signJWT(payload);
+      
       // Send transaction to target bank
       const response = await axios.post(bankInfo.transactionUrl, { jwt: token });
-
-      // Check response
+      
       if (response.status === 200 && response.data.receiverName) {
-        // Update transaction status
+        // Transaction successful, update transaction
         await transaction.update({
           status: 'completed',
           receiverName: response.data.receiverName
         }, { transaction: dbTransaction });
-
-        // Update source account balance
-        await sourceAccount.update({
-          balance: sourceAccount.balance - amount
-        }, { transaction: dbTransaction });
-
-        // Commit the transaction
+        
+        // Deduct amount from source account
+        await sourceAccount.update(
+          { balance: sequelize.literal(`balance - ${amount}`) },
+          { transaction: dbTransaction }
+        );
+        
         await dbTransaction.commit();
-
+        
         return res.status(201).json({
           success: true,
-          data: transaction,
+          data: transaction
         });
       } else {
-        // Transaction failed
-        await transaction.update({ status: 'failed' }, { transaction: dbTransaction });
-        await dbTransaction.commit();
-
-        return res.status(502).json({
-          success: false,
-          error: 'Target bank returned an error',
-        });
+        throw new Error('Invalid response from target bank');
       }
     } catch (error) {
-      // Transaction failed
-      await transaction.update({ status: 'failed' }, { transaction: dbTransaction });
+      console.error('External transaction error:', error.message);
+      
+      // Mark transaction as failed
+      await transaction.update({
+        status: 'failed',
+        failureReason: error.message || 'External bank communication error'
+      }, { transaction: dbTransaction });
+      
       await dbTransaction.commit();
-
-      console.error('Error processing external transaction:', error);
+      
       return res.status(502).json({
         success: false,
-        error: error.message || 'Error processing external transaction',
+        error: 'Failed to process transaction with external bank',
+        details: error.message
       });
     }
   } catch (error) {
-    // Rollback the transaction in case of error
+    // Rollback in case of error
     await dbTransaction.rollback();
     console.error('Error creating external transaction:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: 'Server error'
     });
   }
 };
 
-// Handle incoming B2B transactions
+/**
+ * Handle incoming B2B transaction from another bank
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
 exports.handleB2BTransaction = async (req, res) => {
-  // Start a transaction to ensure data consistency
+  // Start a database transaction for consistency
   const dbTransaction = await sequelize.transaction();
   
   try {
     const { jwt: token } = req.body;
-
+    
     if (!token) {
       await dbTransaction.rollback();
       return res.status(400).json({
         success: false,
-        error: 'JWT token is required',
+        error: 'JWT token is required'
       });
     }
-
-    // Verify JWT structure (without signature verification yet)
-    let payload;
+    
+    // Decode token to get header and payload (without verifying signature yet)
+    let decodedToken;
     try {
-      // Decode without verification first to get the header
-      const decoded = jwt.decode(token, { complete: true });
-      
-      if (!decoded) {
-        await dbTransaction.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid JWT structure',
-        });
+      decodedToken = jwt.decode(token, { complete: true });
+      if (!decodedToken) {
+        throw new Error('Invalid JWT structure');
       }
-      
-      payload = decoded.payload;
     } catch (error) {
       await dbTransaction.rollback();
       return res.status(400).json({
         success: false,
-        error: 'Invalid JWT format',
+        error: 'Invalid JWT format'
       });
     }
-
-    // Extract transaction details
+    
+    // Extract payload and header
+    const { payload, header } = decodedToken;
     const { accountFrom, accountTo, amount, currency, explanation, senderName } = payload;
-
-    // Verify the receiving account exists
-    const targetAccount = await Account.findOne({ 
+    
+    // Verify that the target account belongs to this bank
+    if (!isSameBank(accountTo)) {
+      await dbTransaction.rollback();
+      return res.status(400).json({
+        success: false,
+        error: 'Target account does not belong to this bank'
+      });
+    }
+    
+    // Check if target account exists
+    const targetAccount = await Account.findOne({
       where: { accountNumber: accountTo },
       transaction: dbTransaction
     });
-
+    
     if (!targetAccount) {
       await dbTransaction.rollback();
       return res.status(404).json({
         success: false,
-        error: 'Receiving account not found',
+        error: 'Target account not found'
       });
     }
-
-    // Get source bank information from Central Bank
+    
+    // Get source bank info
     const sourceBankPrefix = accountFrom.substring(0, 3);
     const sourceBankInfo = await getBankInfo(sourceBankPrefix);
-
-    if (!sourceBankInfo) {
+    
+    if (!sourceBankInfo || !sourceBankInfo.jwksUrl) {
       await dbTransaction.rollback();
-      return res.status(404).json({
+      return res.status(400).json({
         success: false,
-        error: 'Source bank not found',
+        error: 'Source bank not found or invalid'
       });
     }
-
-    // Get the source bank's public key from their JWKS endpoint
+    
+    // Get source bank's public key from JWKS
+    let publicKey;
     try {
       const jwksResponse = await axios.get(sourceBankInfo.jwksUrl);
       const jwks = jwksResponse.data;
-
-      // Find the key used to sign the JWT (using kid from the JWT header)
-      const header = jwt.decode(token, { complete: true }).header;
+      
+      // Find the key used to sign the JWT
       const kid = header.kid;
-
-      const signingKey = jwks.keys.find(key => key.kid === kid);
-
-      if (!signingKey) {
-        await dbTransaction.rollback();
-        return res.status(400).json({
-          success: false,
-          error: 'Invalid signing key',
-        });
+      const key = jwks.keys.find(k => k.kid === kid);
+      
+      if (!key) {
+        throw new Error('Signing key not found in JWKS');
       }
-
+      
       // Convert JWK to PEM format
-      const publicKey = signingKey.x5c ? `-----BEGIN CERTIFICATE-----\n${signingKey.x5c[0]}\n-----END CERTIFICATE-----` :
-        `-----BEGIN PUBLIC KEY-----\n${signingKey.n}\n-----END PUBLIC KEY-----`;
-
-      // Verify JWT signature
-      jwt.verify(token, publicKey, { algorithms: ['RS256'] });
-
-      // Create a transaction record
-      const transaction = await Transaction.create({
-        accountFrom,
-        accountTo,
-        amount,
-        currency,
-        explanation,
-        senderName,
-        receiverName: targetAccount.owner,
-        status: 'completed',
-        isInternalTransaction: false,
-      }, { transaction: dbTransaction });
-
-      // Update account balance
-      await targetAccount.update({
-        balance: targetAccount.balance + amount
-      }, { transaction: dbTransaction });
-
-      // Commit the transaction
-      await dbTransaction.commit();
-
-      // Return success with receiver's name
-      return res.status(200).json({
-        receiverName: targetAccount.owner,
-      });
+      // This is a simplified version, in practice use a library like jwk-to-pem
+      publicKey = `-----BEGIN PUBLIC KEY-----\n${key.n}\n-----END PUBLIC KEY-----`;
     } catch (error) {
       await dbTransaction.rollback();
-      console.error('Error verifying JWT:', error);
       return res.status(400).json({
         success: false,
-        error: 'JWT verification failed',
+        error: 'Failed to retrieve source bank public key'
       });
     }
+    
+    // Verify JWT signature
+    try {
+      verifyJWT(token, publicKey);
+    } catch (error) {
+      await dbTransaction.rollback();
+      return res.status(401).json({
+        success: false,
+        error: 'JWT signature verification failed'
+      });
+    }
+    
+    // Create transaction record
+    const transaction = await Transaction.create({
+      transactionId: decodedToken.jti || null,
+      accountFrom,
+      accountTo,
+      amount,
+      currency,
+      explanation,
+      senderName,
+      receiverName: targetAccount.owner,
+      status: 'completed',
+      isInternal: false,
+      externalBankId: sourceBankPrefix
+    }, { transaction: dbTransaction });
+    
+    // Credit target account
+    await targetAccount.update(
+      { balance: sequelize.literal(`balance + ${amount}`) },
+      { transaction: dbTransaction }
+    );
+    
+    // Commit transaction
+    await dbTransaction.commit();
+    
+    // Return success with receiver name (as required by spec)
+    res.status(200).json({
+      receiverName: targetAccount.owner
+    });
   } catch (error) {
-    // Rollback the transaction in case of error
+    // Rollback in case of error
     if (dbTransaction) await dbTransaction.rollback();
     console.error('Error handling B2B transaction:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
+      error: 'Server error'
     });
   }
 };
 
-// Provide JWKS (JSON Web Key Set) with the bank's public key
-exports.getJWKS = async (req, res) => {
+/**
+ * Get JWKS (JSON Web Key Set) for the bank
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ */
+exports.getJWKS = (req, res) => {
   try {
-    // Load public key
-    const publicKeyPath = process.env.PUBLIC_KEY_PATH || path.join(__dirname, '../public-key.pem');
-    const publicKey = fs.readFileSync(publicKeyPath, 'utf8');
-
-    // Convert PEM to JWK (simplified for this example)
-    // In a production environment, use a library like 'jwk-to-pem' to properly convert between formats
-    const jwks = {
-      keys: [
-        {
-          kty: 'RSA',
-          use: 'sig',
-          kid: '1',
-          alg: 'RS256',
-          n: publicKey
-            .replace('-----BEGIN PUBLIC KEY-----', '')
-            .replace('-----END PUBLIC KEY-----', '')
-            .replace(/\s/g, ''),
-          e: 'AQAB',
-        },
-      ],
-    };
-
+    const jwks = getJWKS();
     res.status(200).json(jwks);
   } catch (error) {
-    console.error('Error providing JWKS:', error);
+    console.error('Error getting JWKS:', error);
     res.status(500).json({
       success: false,
-      error: error.message,
-    });
-  }
-};
-
-// Get all transactions
-exports.getTransactions = async (req, res) => {
-  try {
-    const transactions = await Transaction.findAll({
-      order: [['createdAt', 'DESC']]
-    });
-
-    res.status(200).json({
-      success: true,
-      count: transactions.length,
-      data: transactions,
-    });
-  } catch (error) {
-    console.error('Error getting transactions:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
-// Get a single transaction
-exports.getTransaction = async (req, res) => {
-  try {
-    const transaction = await Transaction.findByPk(req.params.id);
-
-    if (!transaction) {
-      return res.status(404).json({
-        success: false,
-        error: 'Transaction not found',
-      });
-    }
-
-    res.status(200).json({
-      success: true,
-      data: transaction,
-    });
-  } catch (error) {
-    console.error('Error getting transaction:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
-    });
-  }
-};
-
-// Get transactions for a specific account
-exports.getAccountTransactions = async (req, res) => {
-  try {
-    const { accountNumber } = req.params;
-
-    // Find transactions where the account is either the sender or receiver
-    const transactions = await Transaction.findAll({
-      where: {
-        [Op.or]: [
-          { accountFrom: accountNumber },
-          { accountTo: accountNumber },
-        ],
-      },
-      order: [['createdAt', 'DESC']]
-    });
-
-    res.status(200).json({
-      success: true,
-      count: transactions.length,
-      data: transactions,
-    });
-  } catch (error) {
-    console.error('Error getting account transactions:', error);
-    res.status(500).json({
-      success: false,
-      error: error.message,
+      error: 'Failed to retrieve JWKS'
     });
   }
 };
