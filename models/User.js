@@ -53,6 +53,7 @@ const User = sequelize.define('User', {
     allowNull: true,
   },
 }, {
+  tableName: 'users', // Explicitly set the table name to avoid issues
   timestamps: true,
 });
 

@@ -23,7 +23,7 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: false,
   },
   amount: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.FLOAT, // Changed from DECIMAL to FLOAT for SQLite compatibility
     allowNull: false,
     validate: {
       min: 0.01,
@@ -70,6 +70,7 @@ const Transaction = sequelize.define('Transaction', {
     allowNull: true,
   },
 }, {
+  tableName: 'transactions', // Explicitly set the table name to avoid issues
   timestamps: true,
 });
 

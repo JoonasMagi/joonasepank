@@ -33,7 +33,7 @@ const Account = sequelize.define('Account', {
     allowNull: false,
   },
   balance: {
-    type: DataTypes.DECIMAL(10, 2),
+    type: DataTypes.FLOAT,  // Changed from DECIMAL to FLOAT for SQLite compatibility
     allowNull: false,
     defaultValue: 0,
     validate: {
@@ -57,6 +57,7 @@ const Account = sequelize.define('Account', {
     },
   },
 }, {
+  tableName: 'accounts', // Explicitly set the table name to avoid issues
   timestamps: true,
 });
 
