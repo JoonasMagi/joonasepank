@@ -1,5 +1,6 @@
-const { User } = require('../models/User');
+const User = require('../models/User');
 const jwt = require('jsonwebtoken');
+const { sequelize } = require('../db/config');
 require('dotenv').config();
 
 /**

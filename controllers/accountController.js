@@ -1,5 +1,5 @@
-const { Account } = require('../models/Account');
-const { Transaction } = require('../models/Transaction');
+const Account = require('../models/Account');
+const Transaction = require('../models/Transaction');
 const { sequelize } = require('../db/config');
 const { Op } = require('sequelize');
 
