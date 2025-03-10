@@ -18,10 +18,16 @@ const initDatabase = async () => {
     console.log('Starting database initialization...');
 
     // Force sync all models (drops tables if they exist)
+    // This creates the tables based on model definitions
+    console.log('Creating database tables...');
     await sequelize.sync({ force: true });
-    console.log('Database tables created!');
+    console.log('Database tables created successfully!');
+    
+    // Wait a moment to ensure tables are fully created
+    await new Promise(resolve => setTimeout(resolve, 1000));
 
     // Create a demo admin user
+    console.log('Creating demo admin user...');
     const adminUser = await User.create({
       username: 'admin',
       password: 'admin123', // Will be hashed automatically
@@ -33,6 +39,7 @@ const initDatabase = async () => {
     console.log('Demo admin user created:', adminUser.username);
 
     // Create demo accounts
+    console.log('Creating demo accounts...');
     const demoAccounts = [
       {
         owner: 'John Doe',
@@ -51,10 +58,17 @@ const initDatabase = async () => {
       }
     ];
 
-    for (const account of demoAccounts) {
-      await Account.create(account);
+    // Create accounts one by one with proper error handling
+    for (const accountData of demoAccounts) {
+      try {
+        const account = await Account.create(accountData);
+        console.log(`Created account: ${account.accountNumber} (${account.owner})`);
+      } catch (err) {
+        console.error('Error creating demo account:', err);
+        throw err;
+      }
     }
-    console.log('Demo accounts created!', demoAccounts.length, 'accounts');
+    console.log('Demo accounts created:', demoAccounts.length, 'accounts');
 
     console.log('Database initialization completed successfully!');
     process.exit(0);
