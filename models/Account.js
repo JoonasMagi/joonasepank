@@ -60,4 +60,4 @@ const Account = sequelize.define('Account', {
   timestamps: true,
 });
 
-module.exports = { Account };
+module.exports = Account;
