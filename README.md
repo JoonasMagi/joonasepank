@@ -16,7 +16,7 @@ A bank application that can interoperate with other banks via the Central Bank f
 This application consists of:
 
 - **Backend**: Node.js with Express.js framework
-- **Database**: MongoDB for storing accounts and transactions
+- **Database**: SQLite with Sequelize ORM
 - **API Documentation**: Swagger UI
 - **Authentication**: JWT-based signing for transactions
 - **Frontend**: Simple HTML/CSS/JavaScript interface
@@ -24,7 +24,7 @@ This application consists of:
 ## Prerequisites
 
 - Node.js (v14 or higher)
-- MongoDB (local or remote instance)
+- No external database needed (SQLite is embedded)
 - Access to Central Bank API
 
 ## Setup
@@ -52,13 +52,19 @@ This application consists of:
    ```
    This will create `private-key.pem` and `public-key.pem` files in the root directory.
 
-5. **Register with the Central Bank**
+5. **Initialize the database**
+   ```
+   node db/init.js
+   ```
+   This will create the SQLite database file and initialize it with tables and test data.
+
+6. **Register with the Central Bank**
    ```
    node scripts/register-bank.js
    ```
    Update your `.env` file with the received API key.
 
-6. **Start the server**
+7. **Start the server**
    ```
    npm start
    ```
@@ -95,6 +101,33 @@ You can test the application functionality using:
 1. **Swagger UI** - Test API endpoints directly
 2. **Frontend Interface** - Use the web interface at the root URL
 3. **Postman** - Import the included Swagger documentation
+
+## Database Structure
+
+The application uses SQLite with Sequelize ORM for data storage. The database schema includes:
+
+### Accounts Table
+- `id` - Primary key
+- `accountNumber` - Unique account identifier (includes bank prefix)
+- `owner` - Account owner's name
+- `balance` - Current account balance
+- `currency` - Account currency (EUR, USD, GBP)
+- `createdAt` - Account creation timestamp
+- `updatedAt` - Account update timestamp
+
+### Transactions Table
+- `id` - Primary key
+- `accountFrom` - Source account number
+- `accountTo` - Target account number
+- `amount` - Transaction amount
+- `currency` - Transaction currency
+- `explanation` - Transaction description
+- `senderName` - Name of the sender
+- `receiverName` - Name of the receiver
+- `status` - Transaction status (pending, completed, failed)
+- `isInternalTransaction` - Whether transaction is within the same bank
+- `createdAt` - Transaction creation timestamp
+- `updatedAt` - Transaction update timestamp
 
 ## Interoperability with Central Bank
 
