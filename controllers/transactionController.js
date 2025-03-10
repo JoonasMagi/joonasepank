@@ -7,7 +7,8 @@ const fs = require('fs');
 const path = require('path');
 const jwt = require('jsonwebtoken');
 
-// Import utility functions
+// Import utility functions from bankUtils
+// Note: signJWT, verifyJWT, and getJWKS are imported from cryptoUtils.js via bankUtils.js
 const {
   isSameBank,
   getBankInfo,
