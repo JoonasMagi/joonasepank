@@ -1,209 +1,140 @@
-# JoonasMägi Bank (JMB)
+# Joonas Mägi Bank Application
 
-A bank application that can interoperate with other banks via the Central Bank for processing transactions. This application implements the specifications from [Central Bank repository](https://github.com/henno/keskpank).
+A banking application for handling interbank transactions.
 
-## Features
+## Installation
 
-- Account creation and management
-- Intra-bank transactions (within JMB)
-- Inter-bank transactions (to other banks via Central Bank)
-- JWT-based authentication for secure transactions
-- Swagger UI for API documentation
-- Simple frontend interface
+1. Clone the repository:
+```bash
+git clone git@github.com:JoonasMagi/joonasepank.git
+cd joonasepank
+```
 
-## Technical Overview
+2. Install dependencies:
+```bash
+npm install
+```
 
-This application consists of:
+3. Create environment file from the example:
+```bash
+cp .env.example .env
+```
 
-- **Backend**: Node.js with Express.js framework
-- **Database**: SQLite with Sequelize ORM
-- **API Documentation**: Swagger UI
-- **Authentication**: JWT-based signing for transactions
-- **Frontend**: Simple HTML/CSS/JavaScript interface
+4. Edit the `.env` file with your specific configuration:
+```
+PORT=3000
+NODE_ENV=development
 
-## Prerequisites
+# Database
+DB_PATH=./joonasepank.sqlite
 
-- Node.js (v14 or higher)
-- No external database needed (SQLite is embedded)
-- Access to Central Bank API
+# Bank information
+BANK_PREFIX=JMB
+BANK_NAME="Joonas Mägi Bank"
+BANK_OWNER="Joonas Mägi"
+BANK_OWNER_EMAIL="joonas.magi@example.com"
+
+# Central Bank integration
+CENTRAL_BANK_URL=http://localhost:8080
+API_KEY=your-api-key-here
+
+# Security
+PRIVATE_KEY_PATH=./keys/private-key.pem
+PUBLIC_KEY_PATH=./keys/public-key.pem
+
+# Test mode
+TEST_MODE=false
+```
 
 ## Setup
 
-1. **Clone the repository**
-   ```
-   git clone https://github.com/JoonasMagi/joonasepank.git
-   cd joonasepank
-   ```
+### Generate RSA keys
 
-2. **Install dependencies**
-   ```
-   npm install
-   ```
+Before starting the application, you need to generate the RSA key pair that will be used for signing and verifying transactions:
 
-3. **Set up environment variables**
-   ```
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
+```bash
+npm run generate-keys
+```
 
-4. **Generate RSA key pair**
-   ```
-   npm run generate-keys
-   ```
-   This will create a keys directory with private-key.pem and public-key.pem files.
+### Initialize the database
 
-5. **Initialize the database**
-   ```
-   npm run init-db
-   ```
-   This will create the SQLite database file and initialize it with tables and test data.
+Initialize the database with demo data:
 
-6. **Register with the Central Bank**
-   ```
-   node scripts/register-bank.js
-   ```
-   This will register your bank with the Central Bank and update your .env file with the received API key.
+```bash
+npm run init-db
+```
 
-7. **Start the server**
-   ```
-   npm start
-   ```
-   The application will be available at http://localhost:3000
+### Register with Central Bank
 
-## API Documentation
+If you're connecting to a Central Bank system, register your bank:
 
-API documentation is available via Swagger UI at the `/api-docs` endpoint when the server is running. This provides an interactive interface to explore and test all API endpoints.
+```bash
+npm run register-bank
+```
+
+## Running the Application
+
+Start the application in development mode:
+
+```bash
+npm run dev
+```
+
+Or in production mode:
+
+```bash
+npm start
+```
+
+The application will be available at: http://localhost:3000
+
+API documentation is available at: http://localhost:3000/api-docs
 
 ## API Endpoints
 
 ### Authentication
-
-- `POST /api/auth/register` - Register a new user
-- `POST /api/auth/login` - Login a user
-- `GET /api/auth/profile` - Get current user profile
+- POST `/api/auth/login` - Log in to the system
+- POST `/api/auth/register` - Register a new user (if enabled)
 
 ### Accounts
-
-- `GET /api/accounts` - Get all accounts
-- `GET /api/accounts/:accountNumber` - Get account by account number
-- `POST /api/accounts` - Create a new account
-- `PUT /api/accounts/:accountNumber` - Update an account
-- `DELETE /api/accounts/:accountNumber` - Delete an account
-- `GET /api/accounts/:accountNumber/transactions` - Get transactions for an account
+- GET `/api/accounts` - Get all accounts
+- GET `/api/accounts/:id` - Get account by ID
+- POST `/api/accounts` - Create a new account
+- PUT `/api/accounts/:id` - Update an account
+- DELETE `/api/accounts/:id` - Delete an account
 
 ### Transactions
+- GET `/api/transactions` - Get all transactions
+- GET `/api/transactions/:id` - Get transaction by ID
+- POST `/api/transactions/internal` - Create an internal transaction
+- POST `/api/transactions/external` - Create an external transaction (to another bank)
+- POST `/api/transactions/b2b` - Handle B2B transaction from another bank
+- GET `/api/transactions/jwks` - Get bank's JWKS (JSON Web Key Set)
 
-- `GET /api/transactions` - Get all transactions
-- `GET /api/transactions/:id` - Get transaction by ID
-- `POST /api/transactions/internal` - Create an internal transaction
-- `POST /api/transactions/external` - Create an external transaction
-- `POST /api/transactions/b2b` - Handle incoming B2B transaction
-- `GET /api/transactions/jwks` - Get bank's JWKS
+## Troubleshooting
 
-## Database Structure
+If you encounter any issues, here are some common solutions:
 
-The application uses SQLite with Sequelize ORM for data storage. The database schema includes:
+### Application Fails to Start
 
-### Accounts Table
-- `id` - Primary key
-- `accountNumber` - Unique account identifier (includes bank prefix)
-- `owner` - Account owner's name
-- `balance` - Current account balance
-- `currency` - Account currency (EUR, USD, GBP)
-- `status` - Account status (active, blocked, closed)
-- `createdAt` - Account creation timestamp
-- `updatedAt` - Account update timestamp
+1. Make sure the `.env` file exists and is properly configured
+2. Ensure that RSA keys have been generated using `npm run generate-keys`
+3. Check that the database has been initialized with `npm run init-db`
 
-### Transactions Table
-- `id` - Primary key
-- `transactionId` - Unique UUID for the transaction
-- `accountFrom` - Source account number
-- `accountTo` - Target account number
-- `amount` - Transaction amount
-- `currency` - Transaction currency
-- `explanation` - Transaction description
-- `senderName` - Name of the sender
-- `receiverName` - Name of the receiver
-- `status` - Transaction status (pending, completed, failed)
-- `isInternal` - Whether transaction is within the same bank
-- `externalBankId` - ID of external bank (if not internal)
-- `failureReason` - Reason for failure (if failed)
-- `createdAt` - Transaction creation timestamp
-- `updatedAt` - Transaction update timestamp
+### Transaction Issues
 
-### Users Table
-- `id` - Primary key
-- `username` - Unique username
-- `password` - Hashed password
-- `email` - User's email
-- `firstName` - User's first name
-- `lastName` - User's last name
-- `role` - User's role (user, admin)
-- `lastLogin` - Last login timestamp
-- `createdAt` - User creation timestamp
-- `updatedAt` - User update timestamp
+1. For external transactions, ensure that the target bank is properly registered
+2. Check that the Central Bank URL and API key are correct in the `.env` file
+3. Verify that your bank is registered with the Central Bank using `npm run register-bank`
 
-## Interoperability with Central Bank
+### JWT Authentication Problems
 
-The application implements the Central Bank specifications from https://github.com/henno/keskpank/blob/master/SPECIFICATIONS.md including:
+If you're having issues with JWT authentication:
 
-- Account number format with bank prefix
-- JWT-based transaction authorization
-- Transaction flow for both internal and external transfers
-- Public key sharing via JWKS endpoint
-
-## Implementation Details
-
-### Account Numbers
-
-Account numbers follow the format: `{BANK_PREFIX}{UUID}` where:
-- `BANK_PREFIX` is the 3-character code assigned by the Central Bank
-- `UUID` is a random UUID without hyphens
-
-### Transaction Security
-
-Transactions between banks are secured using:
-- RSA key pairs (2048-bit)
-- JWT tokens signed with the private key
-- Signature verification using the public key from JWKS endpoint
-
-## Frontend
-
-A simple frontend is provided for testing and demonstration purposes. It allows:
-
-- User registration and login
-- Account management (create, view details)
-- Transaction history viewing
-- Making internal and external transfers
-- Profile management
-
-## Testing
-
-You can test the application in various ways:
-
-1. **Using the Web Interface**
-   - Create accounts and make transactions through the frontend UI
-   - Test both internal and external transfers
-
-2. **Using Swagger UI**
-   - Access `/api-docs` to interact with the API directly
-   - Test individual endpoints with different parameters
-
-3. **Bank-to-Bank Testing**
-   - Set up multiple banks to test interbank transfers
-   - Use TEST_MODE in .env to simulate Central Bank interactions
-
-## Security Considerations
-
-- All passwords are hashed using bcrypt before storage
-- JWT tokens are used for API authentication
-- RSA-256 signing is used for secure interbank transactions
-- The application implements proper input validation and error handling
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
+1. Regenerate your RSA keys: `npm run generate-keys`
+2. Make sure the key paths in `.env` are correct
+3. Check if the Central Bank has your correct public key
 
 ## License
 
-ISC
+This project is licensed under the ISC License.
