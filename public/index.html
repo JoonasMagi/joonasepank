@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="ie=edge">
+  <title>JoonasMägi Bank</title>
+  <link rel="stylesheet" href="/css/style.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="logo">
+        <h1><i class="fas fa-university"></i> JoonasMägi Bank</h1>
+        <p>Inter-bank Transaction System</p>
+      </div>
+      <nav id="main-nav">
+        <div class="nav-section" id="public-nav">
+          <button class="nav-btn" id="login-btn">Login</button>
+          <button class="nav-btn" id="register-btn">Register</button>
+        </div>
+        <div class="nav-section hidden" id="authenticated-nav">
+          <button class="nav-btn" id="accounts-btn">Accounts</button>
+          <button class="nav-btn" id="transactions-btn">Transactions</button>
+          <button class="nav-btn" id="profile-btn">Profile</button>
+          <button class="nav-btn" id="logout-btn">Logout</button>
+        </div>
+      </nav>
+    </header>
+
+    <main>
+      <!-- Welcome Section (Public) -->
+      <section id="welcome-section" class="content-section">
+        <div class="section-content">
+          <h2>Welcome to JoonasMägi Bank</h2>
+          <p>A modern banking solution with inter-bank transaction capabilities.</p>
+          <div class="features">
+            <div class="feature">
+              <i class="fas fa-exchange-alt"></i>
+              <h3>Easy Transfers</h3>
+              <p>Send money to other accounts within our bank or to external banks.</p>
+            </div>
+            <div class="feature">
+              <i class="fas fa-lock"></i>
+              <h3>Secure</h3>
+              <p>All transactions are secured with JWT-based authentication and RSA encryption.</p>
+            </div>
+            <div class="feature">
+              <i class="fas fa-globe"></i>
+              <h3>Multiple Currencies</h3>
+              <p>Support for EUR, USD, and GBP currencies.</p>
+            </div>
+          </div>
+          <div class="cta">
+            <button id="get-started-btn" class="primary-btn">Get Started</button>
+            <a href="/api-docs" class="secondary-btn" target="_blank">API Documentation</a>
+          </div>
+        </div>
+      </section>
+
+      <!-- Login Section -->
+      <section id="login-section" class="content-section hidden">
+        <div class="section-content">
+          <h2>Login to Your Account</h2>
+          <form id="login-form">
+            <div class="form-group">
+              <label for="login-username">Username</label>
+              <input type="text" id="login-username" name="username" required>
+            </div>
+            <div class="form-group">
+              <label for="login-password">Password</label>
+              <input type="password" id="login-password" name="password" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary-btn">Login</button>
+              <button type="button" class="text-btn" id="switch-to-register">Need an account? Register</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Register Section -->
+      <section id="register-section" class="content-section hidden">
+        <div class="section-content">
+          <h2>Create an Account</h2>
+          <form id="register-form">
+            <div class="form-group">
+              <label for="register-username">Username</label>
+              <input type="text" id="register-username" name="username" required>
+            </div>
+            <div class="form-group">
+              <label for="register-email">Email</label>
+              <input type="email" id="register-email" name="email" required>
+            </div>
+            <div class="form-row">
+              <div class="form-group">
+                <label for="register-firstName">First Name</label>
+                <input type="text" id="register-firstName" name="firstName" required>
+              </div>
+              <div class="form-group">
+                <label for="register-lastName">Last Name</label>
+                <input type="text" id="register-lastName" name="lastName" required>
+              </div>
+            </div>
+            <div class="form-group">
+              <label for="register-password">Password</label>
+              <input type="password" id="register-password" name="password" required>
+            </div>
+            <div class="form-group">
+              <label for="register-confirm-password">Confirm Password</label>
+              <input type="password" id="register-confirm-password" name="confirmPassword" required>
+            </div>
+            <div class="form-actions">
+              <button type="submit" class="primary-btn">Register</button>
+              <button type="button" class="text-btn" id="switch-to-login">Already have an account? Login</button>
+            </div>
+          </form>
+        </div>
+      </section>
+
+      <!-- Accounts Section -->
+      <section id="accounts-section" class="content-section hidden">
+        <div class="section-content">
+          <h2>Your Accounts</h2>
+          <div class="accounts-container">
+            <div class="accounts-list" id="accounts-list">
+              <!-- Accounts will be loaded here -->
+              <div class="loading">Loading accounts...</div>
+            </div>
+            <div class="account-actions">
+              <button id="create-account-btn" class="primary-btn">Create New Account</button>
+            </div>
+          </div>
+
+          <!-- Create Account Form (Hidden Initially) -->
+          <div id="create-account-form-container" class="modal-container hidden">
+            <div class="modal">
+              <div class="modal-header">
+                <h3>Create New Account</h3>
+                <button class="close-btn">&times;</button>
+              </div>
+              <div class="modal-body">
+                <form id="create-account-form">
+                  <div class="form-group">
+                    <label for="account-owner">Account Owner</label>
+                    <input type="text" id="account-owner" name="owner" required>
+                  </div>
+                  <div class="form-row">
+                    <div class="form-group">
+                      <label for="account-balance">Initial Balance</label>
+                      <input type="number" id="account-balance" name="balance" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                      <label for="account-currency">Currency</label>
+                      <select id="account-currency" name="currency">
+                        <option value="EUR">EUR</option>
+                        <option value="USD">USD</option>
+                        <option value="GBP">GBP</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="form-actions">
+                    <button type="submit" class="primary-btn">Create Account</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Account Details Section -->
+      <section id="account-details-section" class="content-section hidden">
+        <div class="section-content">
+          <div class="section-header">
+            <button id="back-to-accounts" class="back-btn"><i class="fas fa-arrow-left"></i> Back to Accounts</button>
+            <h2>Account Details</h2>
+          </div>
+          <div id="account-info" class="account-info">
+            <!-- Account info will be loaded here -->
+          </div>
+          <div class="tabs">
+            <button class="tab-btn active" data-tab="transactions">Transactions</button>
+            <button class="tab-btn" data-tab="transfer">Make Transfer</button>
+          </div>
+          <div class="tab-content">
+            <div id="transactions-tab" class="tab-pane active">
+              <h3>Transaction History</h3>
+              <div id="account-transactions" class="transactions-list">
+                <!-- Transactions will be loaded here -->
+                <div class="loading">Loading transactions...</div>
+              </div>
+            </div>
+            <div id="transfer-tab" class="tab-pane">
+              <h3>Make a Transfer</h3>
+              <form id="transfer-form">
+                <input type="hidden" id="transfer-from" name="accountFrom">
+                <div class="form-group">
+                  <label for="transfer-to">To Account Number</label>
+                  <input type="text" id="transfer-to" name="accountTo" required>
+                  <small>Format: XXX + account number (e.g., JMB12345...)</small>
+                </div>
+                <div class="form-row">
+                  <div class="form-group">
+                    <label for="transfer-amount">Amount</label>
+                    <input type="number" id="transfer-amount" name="amount" min="0.01" step="0.01" required>
+                  </div>
+                  <div class="form-group">
+                    <label for="transfer-currency">Currency</label>
+                    <select id="transfer-currency" name="currency">
+                      <option value="EUR">EUR</option>
+                      <option value="USD">USD</option>
+                      <option value="GBP">GBP</option>
+                    </select>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <label for="transfer-explanation">Explanation</label>
+                  <input type="text" id="transfer-explanation" name="explanation" required>
+                </div>
+                <div class="form-group">
+                  <label for="transfer-sender-name">Sender Name</label>
+                  <input type="text" id="transfer-sender-name" name="senderName" required>
+                </div>
+                <div class="form-actions">
+                  <button type="submit" class="primary-btn">Send Money</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Transactions Section -->
+      <section id="transactions-section" class="content-section hidden">
+        <div class="section-content">
+          <h2>All Transactions</h2>
+          <div class="filter-container">
+            <div class="filter-group">
+              <label for="transaction-filter">Filter by Status:</label>
+              <select id="transaction-filter">
+                <option value="all">All</option>
+                <option value="completed">Completed</option>
+                <option value="pending">Pending</option>
+                <option value="failed">Failed</option>
+              </select>
+            </div>
+          </div>
+          <div id="all-transactions" class="transactions-list">
+            <!-- Transactions will be loaded here -->
+            <div class="loading">Loading transactions...</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Profile Section -->
+      <section id="profile-section" class="content-section hidden">
+        <div class="section-content">
+          <h2>Your Profile</h2>
+          <div id="profile-info" class="profile-info">
+            <!-- Profile info will be loaded here -->
+            <div class="loading">Loading profile...</div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      <div class="footer-content">
+        <div class="footer-section">
+          <h3>JoonasMägi Bank</h3>
+          <p>A modern banking solution with inter-bank transaction capabilities.</p>
+        </div>
+        <div class="footer-section">
+          <h3>Links</h3>
+          <ul>
+            <li><a href="/">Home</a></li>
+            <li><a href="/api-docs" target="_blank">API Documentation</a></li>
+          </ul>
+        </div>
+        <div class="footer-section">
+          <h3>Contact</h3>
+          <p>Email: joonas.magi@example.com</p>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <p>&copy; 2025 JoonasMägi Bank. All rights reserved.</p>
+      </div>
+    </footer>
+
+    <!-- Notification System -->
+    <div id="notification-container"></div>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>
