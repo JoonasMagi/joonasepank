@@ -3,7 +3,6 @@
  * Creates and initializes the SQLite database tables
  */
 
-const { Sequelize } = require('sequelize');
 const { sequelize } = require('./config');
 const path = require('path');
 const fs = require('fs');
@@ -11,13 +10,8 @@ const fs = require('fs');
 // Load environment variables with the correct path
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-// Import models directly, not using destructuring
-const Account = require('../models/Account');
-const Transaction = require('../models/Transaction');
-const User = require('../models/User');
-
-// Make sure models are associated if needed (add this if there are model associations)
-// For example: Account.hasMany(Transaction);
+// Import models from the index file
+const { Account, Transaction, User } = require('../models');
 
 // Initialize database
 const initDatabase = async () => {
