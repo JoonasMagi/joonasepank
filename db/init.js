@@ -7,10 +7,10 @@ const { sequelize } = require('./config');
 const path = require('path');
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-// Import models
-const { Account } = require('../models/Account');
-const { Transaction } = require('../models/Transaction');
-const { User } = require('../models/User');
+// Import models directly, not using destructuring
+const Account = require('../models/Account');
+const Transaction = require('../models/Transaction');
+const User = require('../models/User');
 
 // Initialize database
 const initDatabase = async () => {
