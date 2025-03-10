@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const jwt = require('jsonwebtoken');
 const { sequelize } = require('../db/config');
+const { Op } = require('sequelize'); // Add this import
 require('dotenv').config();
 
 /**
@@ -15,7 +16,7 @@ exports.register = async (req, res) => {
     // Check if username or email already exists
     const existingUser = await User.findOne({
       where: {
-        [sequelize.Op.or]: [
+        [Op.or]: [ // Now Op is properly defined
           { username },
           { email }
         ]
