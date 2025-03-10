@@ -1,5 +1,6 @@
 const axios = require('axios');
 const dotenv = require('dotenv');
+const { signJWT, verifyJWT, getJWKS } = require('./cryptoUtils');
 
 // Load environment variables
 dotenv.config();
@@ -82,3 +83,11 @@ exports.registerBank = async (bankDetails) => {
     return null;
   }
 };
+
+// Export JWT utility functions
+exports.signJWT = signJWT;
+exports.verifyJWT = verifyJWT;
+exports.getJWKS = getJWKS;
+
+// Export bank prefix
+exports.BANK_PREFIX = BANK_PREFIX;
