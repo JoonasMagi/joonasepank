@@ -14,8 +14,10 @@ require('dotenv').config();
 // Import database configuration
 const { sequelize, testConnection } = require('./db/config');
 
-// Import models
-require('./models'); // This loads all models to ensure they're registered with sequelize
+// Import models directly to ensure they're registered with sequelize
+const Account = require('./models/Account');
+const Transaction = require('./models/Transaction');
+const User = require('./models/User');
 
 // Create Express app
 const app = express();
