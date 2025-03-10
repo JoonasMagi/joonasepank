@@ -8,6 +8,7 @@
     "dev": "nodemon server.js",
     "init-db": "node ./db/init.js",
     "generate-keys": "node ./scripts/generate-keys.js",
+    "register-bank": "node ./scripts/register-bank.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [
