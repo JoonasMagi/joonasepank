@@ -3,8 +3,12 @@
  * Creates and initializes the SQLite database tables
  */
 
+const { Sequelize } = require('sequelize');
 const { sequelize } = require('./config');
 const path = require('path');
+const fs = require('fs');
+
+// Load environment variables with the correct path
 require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
 // Import models directly, not using destructuring
@@ -12,10 +16,22 @@ const Account = require('../models/Account');
 const Transaction = require('../models/Transaction');
 const User = require('../models/User');
 
+// Make sure models are associated if needed (add this if there are model associations)
+// For example: Account.hasMany(Transaction);
+
 // Initialize database
 const initDatabase = async () => {
   try {
     console.log('Starting database initialization...');
+
+    // Test the database connection first
+    try {
+      await sequelize.authenticate();
+      console.log('Database connection has been established successfully.');
+    } catch (error) {
+      console.error('Unable to connect to the database:', error);
+      process.exit(1);
+    }
 
     // Force sync all models (drops tables if they exist)
     // This creates the tables based on model definitions
@@ -23,8 +39,9 @@ const initDatabase = async () => {
     await sequelize.sync({ force: true });
     console.log('Database tables created successfully!');
     
-    // Wait a moment to ensure tables are fully created
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Wait for tables to be fully created
+    console.log('Waiting for tables to be properly initialized...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
 
     // Create a demo admin user
     console.log('Creating demo admin user...');
