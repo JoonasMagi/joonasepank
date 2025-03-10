@@ -1,35 +1,62 @@
 /**
  * Database initialization script
- * 
- * This script creates and initializes the SQLite database and tables
- * Run with: node db/init.js
+ * Creates and initializes the SQLite database tables
  */
 
-const { sequelize } = require('./database');
-const Account = require('../models/account');
-const Transaction = require('../models/transaction');
+const { sequelize } = require('./config');
+const path = require('path');
+require('dotenv').config({ path: path.join(__dirname, '../.env') });
 
-// Function to initialize the database
-const initializeDatabase = async () => {
+// Import models
+const { Account } = require('../models/Account');
+const { Transaction } = require('../models/Transaction');
+const { User } = require('../models/User');
+
+// Initialize database
+const initDatabase = async () => {
   try {
-    console.log('Initializing database...');
-    
-    // Sync all models with the database
-    // Force: true will drop tables if they exist
+    console.log('Starting database initialization...');
+
+    // Force sync all models (drops tables if they exist)
     await sequelize.sync({ force: true });
-    
-    console.log('Database synchronized successfully');
-    
-    // Create a test account
-    const testAccount = await Account.create({
-      owner: 'Test User',
-      balance: 1000,
-      currency: 'EUR'
+    console.log('Database tables created!');
+
+    // Create a demo admin user
+    const adminUser = await User.create({
+      username: 'admin',
+      password: 'admin123', // Will be hashed automatically
+      email: 'admin@joonasepank.com',
+      role: 'admin',
+      firstName: 'Admin',
+      lastName: 'User'
     });
-    
-    console.log('Test account created:', testAccount.toJSON());
-    
-    console.log('Database initialization completed successfully');
+    console.log('Demo admin user created:', adminUser.username);
+
+    // Create demo accounts
+    const demoAccounts = [
+      {
+        owner: 'John Doe',
+        balance: 10000,
+        currency: 'EUR'
+      },
+      {
+        owner: 'Jane Smith',
+        balance: 5000,
+        currency: 'USD'
+      },
+      {
+        owner: 'Bob Johnson',
+        balance: 7500,
+        currency: 'GBP'
+      }
+    ];
+
+    for (const account of demoAccounts) {
+      await Account.create(account);
+    }
+    console.log('Demo accounts created!', demoAccounts.length, 'accounts');
+
+    console.log('Database initialization completed successfully!');
     process.exit(0);
   } catch (error) {
     console.error('Error initializing database:', error);
@@ -38,4 +65,4 @@ const initializeDatabase = async () => {
 };
 
 // Run the initialization
-initializeDatabase();
+initDatabase();
