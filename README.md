@@ -64,6 +64,16 @@ Initialize the database with demo data:
 npm run init-db
 ```
 
+**Important**: The database initialization script needs the models to be properly loaded. If you encounter any "no such table" errors, try the following steps:
+
+1. Make sure the .env file exists and is properly configured
+2. Ensure all required dependencies are installed
+3. Try running the script again with a fresh database file:
+   ```bash
+   rm -f ./joonasepank.sqlite
+   npm run init-db
+   ```
+
 ### Register with Central Bank
 
 If you're connecting to a Central Bank system, register your bank:
@@ -120,6 +130,17 @@ If you encounter any issues, here are some common solutions:
 1. Make sure the `.env` file exists and is properly configured
 2. Ensure that RSA keys have been generated using `npm run generate-keys`
 3. Check that the database has been initialized with `npm run init-db`
+4. Verify that all models are correctly loaded by checking the `models/index.js` file
+
+### Database Issues
+
+1. If you see "no such table" errors, delete the existing database file and initialize again:
+   ```bash
+   rm -f ./joonasepank.sqlite
+   npm run init-db
+   ```
+2. If issues persist, check that the DB_PATH in your .env file is correct
+3. Ensure you have write permissions to the database directory
 
 ### Transaction Issues
 
